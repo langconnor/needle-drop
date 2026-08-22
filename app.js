@@ -52,6 +52,7 @@ const timelineFill = $("timeline-fill");
 const timelineTickEls = [...document.querySelectorAll(".timeline-ticks span")];
 const timelineLabelEls = [...document.querySelectorAll(".timeline-labels span")];
 const dialReadoutValue = $("dial-readout-value");
+const volumeSlider = $("volume-slider");
 
 const attemptsRow = $("attempts-row");
 const guessInput = $("guess-input");
@@ -200,6 +201,11 @@ let player = null;
 let deviceId = null;
 let sdkReady = false;
 
+function getSavedVolume() {
+  const raw = Number(localStorage.getItem("nd_volume"));
+  return Number.isFinite(raw) && raw >= 0 && raw <= 100 ? raw : 80;
+}
+
 window.onSpotifyWebPlaybackSDKReady = () => {
   sdkReady = true;
   initPlayer();
@@ -210,7 +216,7 @@ function initPlayer() {
   player = new Spotify.Player({
     name: "Needle Drop",
     getOAuthToken: (cb) => getValidToken().then(cb),
-    volume: 0.8,
+    volume: getSavedVolume() / 100,
   });
 
   player.addListener("ready", async ({ device_id }) => {
@@ -714,6 +720,13 @@ btnPool.addEventListener("click", async () => {
   const q = playlistInput.value.trim();
   const ok = q ? await loadSearchPool(q) : await loadLikedSongs();
   if (ok) newRound();
+});
+
+volumeSlider.value = getSavedVolume();
+volumeSlider.addEventListener("input", () => {
+  const value = Number(volumeSlider.value);
+  localStorage.setItem("nd_volume", String(value));
+  player?.setVolume(value / 100).catch(() => {});
 });
 
 // ---------------------------------------------------------------------------
