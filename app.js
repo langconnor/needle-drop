@@ -277,10 +277,18 @@ function nextAnswer() {
   return drawQueue.pop();
 }
 
+// is_playable is only populated when a market is sent along with the
+// request — without it, tracks that are no longer available (removed,
+// region-locked, etc.) look identical to playable ones and end up in the
+// pool anyway.
+function isUsable(t) {
+  return t && t.id && t.uri && t.uri.startsWith("spotify:track:") && t.is_playable !== false && !t.is_local;
+}
+
 async function loadLikedSongs() {
   poolStatus.textContent = "Lade …";
   let items = [];
-  let url = "/me/tracks?limit=50";
+  let url = "/me/tracks?limit=50&market=from_token";
   while (url) {
     const res = await api(url);
     if (!res.ok) {
@@ -295,7 +303,7 @@ async function loadLikedSongs() {
     poolStatus.textContent = `Lade … ${items.length} Songs`;
     url = data.next ? data.next.replace("https://api.spotify.com/v1", "") : null;
   }
-  pool = items.filter((t) => t && t.id && t.uri && t.uri.startsWith("spotify:track:"));
+  pool = items.filter(isUsable);
   if (pool.length < 4) {
     poolStatus.textContent = "Zu wenig Liked Songs (mind. 4 nötig) — versuch Künstler/Genre";
     return false;
@@ -313,7 +321,7 @@ async function loadSearchPool(query) {
   let items = [];
   for (let offset = 0; offset < 50; offset += 10) {
     const res = await api(
-      `/search?type=track&limit=10&offset=${offset}&q=${encodeURIComponent(query)}`
+      `/search?type=track&limit=10&offset=${offset}&market=from_token&q=${encodeURIComponent(query)}`
     );
     if (!res.ok) {
       if (items.length === 0) {
@@ -328,7 +336,7 @@ async function loadSearchPool(query) {
     poolStatus.textContent = `Lade … ${items.length} Songs`;
     if (batch.length < 10) break;
   }
-  pool = items.filter((t) => t && t.id && t.uri && t.uri.startsWith("spotify:track:"));
+  pool = items.filter(isUsable);
   if (pool.length < 4) {
     poolStatus.textContent = "Zu wenig Treffer für diese Suche";
     return false;
