@@ -248,16 +248,14 @@ function initPlayer() {
     if (!state.paused && state.position >= currentTargetMs()) {
       revealedMs = currentTargetMs();
       isPlaying = false;
-      segmentToken++;
+      const myToken = ++segmentToken;
       clearTimeout(stopTimer);
       cancelAnimationFrame(rafId);
       renderDial(revealedMs);
       resetPlayButtonIcon();
-      pausePlayback()
-        .catch(() => {})
-        .finally(() => {
-          btnPlay.disabled = false;
-        });
+      hardPause(myToken).finally(() => {
+        btnPlay.disabled = false;
+      });
     }
   });
 
@@ -274,6 +272,36 @@ async function playFrom(uri, positionMs = 0) {
 
 async function pausePlayback() {
   await api(`/me/player/pause?device_id=${deviceId}`, { method: "PUT" });
+}
+
+// Spotify has confirmed our *play* command well before the device is
+// actually audibly playing — sending pause inside that startup gap can get
+// silently dropped. So we poll the SDK's own state instead of trusting the
+// play request's response, and only start the snippet clock once playback
+// is genuinely confirmed underway.
+async function waitForPlaybackStart(timeoutMs = 2500) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
+    const state = await player?.getCurrentState().catch(() => null);
+    if (state && !state.paused) return state.position || 0;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return 0;
+}
+
+// pausePlayback() alone is fire-and-forget — this verifies the pause
+// actually landed (via getCurrentState) and retries a couple of times if
+// Spotify didn't apply it, which is what used to let a snippet run on into
+// the full song with no way to notice or recover.
+async function hardPause(myToken) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (myToken !== segmentToken) return;
+    await pausePlayback().catch(() => {});
+    await new Promise((r) => setTimeout(r, 200));
+    if (myToken !== segmentToken) return;
+    const state = await player?.getCurrentState().catch(() => null);
+    if (!state || state.paused) return;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -431,12 +459,7 @@ function scheduleAutoStop(myToken) {
     cancelAnimationFrame(rafId);
     renderDial(revealedMs);
     resetPlayButtonIcon();
-    // Keep the button disabled until Spotify has actually confirmed the
-    // pause — re-enabling it earlier left a window where a fast click could
-    // fire a new play command while the pause was still in flight, and
-    // whichever arrived second at Spotify would win, sometimes letting
-    // playback continue unpaused straight into the rest of the song.
-    await pausePlayback().catch(() => {});
+    await hardPause(myToken);
     if (myToken !== segmentToken) return;
     btnPlay.disabled = false;
   }, remaining);
@@ -462,9 +485,16 @@ async function beginSegment(baseMs) {
     return;
   }
   if (myToken !== segmentToken) return; // superseded while this request was in flight
-  // Stamp the clock here, once Spotify has actually acknowledged the play
-  // command, instead of before awaiting it — otherwise network latency eats
-  // into the snippet's timing budget.
+
+  // Don't start the countdown off the play request's response — Spotify can
+  // acknowledge it well before the device is actually audibly playing, and
+  // starting the clock too early is exactly what let very short snippets
+  // (like the 0.1s stage) get pause commands that arrived before playback
+  // had really begun and were silently dropped. Wait for the SDK to confirm
+  // playback is genuinely underway first.
+  const confirmedPosition = await waitForPlaybackStart();
+  if (myToken !== segmentToken) return; // superseded while we were waiting
+  playBaseMs = confirmedPosition || baseMs;
   segmentStartPerf = performance.now();
   scheduleAutoStop(myToken);
   runFillLoop();
