@@ -26,7 +26,7 @@ const SCOPES = [
   "user-library-read",
 ].join(" ");
 
-const SNIPPETS_MS = [1000, 2000, 4000, 7000, 11000, 16000];
+const SNIPPETS_MS = [100, 1000, 2000, 4000, 7000, 11000, 16000];
 const MAX_ATTEMPTS = SNIPPETS_MS.length;
 const TOTAL_MS = SNIPPETS_MS[MAX_ATTEMPTS - 1];
 

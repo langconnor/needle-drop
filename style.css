@@ -292,20 +292,21 @@ body{
   display:flex;
 }
 .timeline-ticks span{
-  /* widths match each attempt's *added* seconds (1,1,2,3,4,5s between the
-     1,2,4,7,11,16s marks) so the boundaries sit exactly where the
+  /* widths match each attempt's *added* seconds (0.1,0.9,1,2,3,4,5s between
+     the 0.1,1,2,4,7,11,16s marks) so the boundaries sit exactly where the
      continuous fill bar — driven by real elapsed ms — actually reaches. */
   flex:1 1 0;
   border-right:2px solid var(--bg);
   position:relative;
   transition:background .25s ease;
 }
-.timeline-ticks span:nth-child(1){flex-grow:1;}
-.timeline-ticks span:nth-child(2){flex-grow:1;}
-.timeline-ticks span:nth-child(3){flex-grow:2;}
-.timeline-ticks span:nth-child(4){flex-grow:3;}
-.timeline-ticks span:nth-child(5){flex-grow:4;}
-.timeline-ticks span:nth-child(6){flex-grow:5;}
+.timeline-ticks span:nth-child(1){flex-grow:0.1;}
+.timeline-ticks span:nth-child(2){flex-grow:0.9;}
+.timeline-ticks span:nth-child(3){flex-grow:1;}
+.timeline-ticks span:nth-child(4){flex-grow:2;}
+.timeline-ticks span:nth-child(5){flex-grow:3;}
+.timeline-ticks span:nth-child(6){flex-grow:4;}
+.timeline-ticks span:nth-child(7){flex-grow:5;}
 .timeline-ticks span:last-child{border-right:none;}
 .timeline-ticks span.spent{background:rgba(255,255,255,.06);}
 .timeline-ticks span.active::after{
@@ -328,12 +329,13 @@ body{
   color:var(--text-faint);
   transition:color .2s ease;
 }
-.timeline-labels span:nth-child(1){flex-grow:1;text-align:left;}
-.timeline-labels span:nth-child(2){flex-grow:1;}
-.timeline-labels span:nth-child(3){flex-grow:2;}
-.timeline-labels span:nth-child(4){flex-grow:3;}
-.timeline-labels span:nth-child(5){flex-grow:4;}
-.timeline-labels span:nth-child(6){flex-grow:5;text-align:right;}
+.timeline-labels span:nth-child(1){flex-grow:0.1;text-align:left;}
+.timeline-labels span:nth-child(2){flex-grow:0.9;}
+.timeline-labels span:nth-child(3){flex-grow:1;}
+.timeline-labels span:nth-child(4){flex-grow:2;}
+.timeline-labels span:nth-child(5){flex-grow:3;}
+.timeline-labels span:nth-child(6){flex-grow:4;}
+.timeline-labels span:nth-child(7){flex-grow:5;text-align:right;}
 .timeline-labels span.active{color:var(--accent);font-weight:600;}
 .timeline-labels span.spent{color:var(--text-dim);}
 
