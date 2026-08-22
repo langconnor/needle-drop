@@ -357,6 +357,7 @@ let segmentStartPerf = null;
 let isPlaying = false;
 let stopTimer = null;
 let rafId = null;
+let segmentToken = 0; // bumped on every new segment so a stale async call can detect it was superseded
 
 function liveRevealedMs() {
   if (!isPlaying || segmentStartPerf == null) return revealedMs;
@@ -388,16 +389,18 @@ function resetPlayButtonIcon() {
   btnPlay.classList.remove("playing");
 }
 
-function scheduleAutoStop() {
+function scheduleAutoStop(myToken) {
   clearTimeout(stopTimer);
   const target = currentTargetMs();
   const remaining = Math.max(0, target - liveRevealedMs());
   stopTimer = setTimeout(async () => {
+    if (myToken !== segmentToken) return; // a newer segment already took over
     revealedMs = target;
     isPlaying = false;
     cancelAnimationFrame(rafId);
     renderDial(revealedMs);
     resetPlayButtonIcon();
+    btnPlay.disabled = false;
     await pausePlayback().catch(() => {});
   }, remaining);
 }
@@ -406,19 +409,27 @@ async function beginSegment(baseMs) {
   if (!deviceId || !answer || gameOver || isPlaying) return;
   isPlaying = true;
   playBaseMs = baseMs;
-  segmentStartPerf = performance.now();
+  const myToken = ++segmentToken;
+  btnPlay.disabled = true; // the literal fix for spamming Play: it just can't be clicked again mid-clip
   iconPlay.classList.add("hidden");
   iconPause.classList.remove("hidden");
   btnPlay.classList.add("playing");
   try {
     await playFrom(answer.uri, baseMs);
   } catch (e) {
+    if (myToken !== segmentToken) return; // superseded while this request was in flight
     gameStatus.textContent = "Konnte nicht abspielen — Spotify-App evtl. woanders aktiv?";
     isPlaying = false;
+    btnPlay.disabled = false;
     resetPlayButtonIcon();
     return;
   }
-  scheduleAutoStop();
+  if (myToken !== segmentToken) return; // superseded while this request was in flight
+  // Stamp the clock here, once Spotify has actually acknowledged the play
+  // command, instead of before awaiting it — otherwise network latency eats
+  // into the snippet's timing budget.
+  segmentStartPerf = performance.now();
+  scheduleAutoStop(myToken);
   runFillLoop();
 }
 
@@ -436,6 +447,7 @@ function continueFromLastStop() {
 // Stops the JS-side timer/animation and, if still playing, pauses Spotify
 // and commits the live position into revealedMs. Used for game-over cleanup.
 function haltPlayback() {
+  segmentToken++; // invalidate any in-flight beginSegment/scheduleAutoStop
   clearTimeout(stopTimer);
   cancelAnimationFrame(rafId);
   if (isPlaying) {
@@ -443,6 +455,7 @@ function haltPlayback() {
     pausePlayback().catch(() => {});
   }
   isPlaying = false;
+  btnPlay.disabled = false;
   resetPlayButtonIcon();
 }
 
@@ -637,7 +650,7 @@ function skip() {
   }
 
   if (wasPlaying) {
-    scheduleAutoStop(); // same stream, just pushes the auto-pause further out
+    scheduleAutoStop(segmentToken); // same stream, just pushes the auto-pause further out
   } else {
     continueFromLastStop(); // plays only the newly added slice, once
   }
