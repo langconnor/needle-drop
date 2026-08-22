@@ -7,7 +7,16 @@
 // ---------------------------------------------------------------------------
 
 const CLIENT_ID = "86ad66b6193946019291f81969b513d4";
-const REDIRECT_URI = window.location.origin + window.location.pathname;
+
+// Normalized so it always lands on the same string regardless of how the
+// page was reached (with/without trailing slash, or via index.html) — that
+// string must match a Redirect URI registered in the Spotify dashboard.
+function computeRedirectUri() {
+  let path = window.location.pathname.replace(/index\.html?$/, "");
+  if (!path.endsWith("/")) path += "/";
+  return window.location.origin + path;
+}
+const REDIRECT_URI = computeRedirectUri();
 const SCOPES = [
   "streaming",
   "user-read-email",
