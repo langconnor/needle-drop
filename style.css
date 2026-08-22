@@ -329,13 +329,13 @@ body{
   color:var(--text-faint);
   transition:color .2s ease;
 }
-.timeline-labels span:nth-child(1){flex-grow:0.1;text-align:left;}
+.timeline-labels span:nth-child(1){flex-grow:0.1;}
 .timeline-labels span:nth-child(2){flex-grow:0.9;}
 .timeline-labels span:nth-child(3){flex-grow:1;}
 .timeline-labels span:nth-child(4){flex-grow:2;}
 .timeline-labels span:nth-child(5){flex-grow:3;}
 .timeline-labels span:nth-child(6){flex-grow:4;}
-.timeline-labels span:nth-child(7){flex-grow:5;text-align:right;}
+.timeline-labels span:nth-child(7){flex-grow:5;}
 .timeline-labels span.active{color:var(--accent);font-weight:600;}
 .timeline-labels span.spent{color:var(--text-dim);}
 
