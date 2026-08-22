@@ -243,6 +243,24 @@ async function pausePlayback() {
 // ---------------------------------------------------------------------------
 let pool = [];
 let poolLabel = "Liked Songs";
+let drawQueue = []; // shuffled draw order; refilled+reshuffled once emptied
+
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Draws without repeats until the whole pool has been seen once, then
+// reshuffles — so the round order actually changes each time instead of
+// plain Math.random() occasionally handing back a song you just had.
+function nextAnswer() {
+  if (drawQueue.length === 0) drawQueue = shuffled(pool);
+  return drawQueue.pop();
+}
 
 async function loadLikedSongs() {
   poolStatus.textContent = "Lade …";
@@ -269,6 +287,7 @@ async function loadLikedSongs() {
   }
   poolLabel = "Liked Songs";
   poolStatus.textContent = `${poolLabel} · ${pool.length} Songs`;
+  drawQueue = [];
   return true;
 }
 
@@ -301,6 +320,7 @@ async function loadSearchPool(query) {
   }
   poolLabel = query;
   poolStatus.textContent = `"${poolLabel}" · ${pool.length} Songs`;
+  drawQueue = [];
   return true;
 }
 
@@ -429,7 +449,7 @@ function newRound() {
   revealedMs = 0;
   renderDial(0);
 
-  answer = pool[Math.floor(Math.random() * pool.length)];
+  answer = nextAnswer();
   attempt = 0;
   history = [];
   gameOver = false;
@@ -530,6 +550,25 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// Strips the parts of a track title that differ between otherwise-identical
+// releases (remaster tags, "feat.", single/album/radio edit suffixes, …) so
+// e.g. the album cut and the single version of the same song compare equal.
+function normalizeTitle(name) {
+  return name
+    .toLowerCase()
+    .replace(/[\(\[][^)\]]*(feat\.?|with|remaster|version|edit|mix|mono|stereo|live|deluxe|explicit|clean|anniversary)[^)\]]*[\)\]]/gi, "")
+    .replace(/\s*-\s*(remaster(ed)?( \d{4})?|radio edit|single version|album version|mono version|stereo version|live|acoustic).*/gi, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSameSong(a, b) {
+  if (a.id === b.id) return true;
+  if (normalizeTitle(a.name) !== normalizeTitle(b.name)) return false;
+  return a.artists.some((x) => b.artists.some((y) => x.id === y.id));
+}
+
 async function submitGuess() {
   if (gameOver) return;
   let guess = selectedGuess;
@@ -543,7 +582,7 @@ async function submitGuess() {
       return;
     }
   }
-  const correct = guess.id === answer.id;
+  const correct = isSameSong(guess, answer);
   registerAttempt(correct, `${guess.name} — ${guess.artists.map((a) => a.name).join(", ")}`);
 }
 
