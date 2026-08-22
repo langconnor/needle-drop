@@ -43,6 +43,7 @@ const accountName = $("account-name");
 
 const playlistInput = $("playlist-input");
 const btnPool = $("btn-pool");
+const btnDaily = $("btn-daily");
 const poolStatus = $("pool-status");
 
 const btnPlay = $("btn-play");
@@ -353,7 +354,10 @@ function shuffled(arr) {
 // Draws without repeats until the whole pool has been seen once, then
 // reshuffles — so the round order actually changes each time instead of
 // plain Math.random() occasionally handing back a song you just had.
+// In Daily Challenge mode this is bypassed entirely: everyone gets the same
+// date-derived track instead of a random draw.
 function nextAnswer() {
+  if (isDailyMode) return pool[0];
   if (drawQueue.length === 0) drawQueue = shuffled(pool);
   return drawQueue.pop();
 }
@@ -364,6 +368,80 @@ function nextAnswer() {
 // pool anyway.
 function isUsable(t) {
   return t && t.id && t.uri && t.uri.startsWith("spotify:track:") && t.is_playable !== false && !t.is_local;
+}
+
+// ---------------------------------------------------------------------------
+// Daily Challenge — a pool that's the same for everyone (unlike Liked Songs,
+// which differs per person), with today's track picked deterministically
+// from the date so friends comparing results are always guessing the same
+// song. Requires no server: the "sync" is just the date + this fixed list.
+// ---------------------------------------------------------------------------
+const DAILY_POOL_IDS = [
+  "0ByMNEPAPpOR5H69DVrTNy", "0GNI8K3VATWBABQFAzBAYe", "0U10zFw4GlBacOy9VDGfGL",
+  "2VOomzT6VavJOGBeySqaMc", "0C4ejWmOTMv8vuYj85mf8m", "60jzFy6Nn4M0iD1d94oteF",
+  "5X3ahLXhOw16BR09GjYPUT", "1zi7xx7UVEFkmKfv06H8x0", "5mCPDVBb16L4XQwDdbRUpz",
+  "047fCsbO4NdmwCBn8pcUXl", "6LxSe8YmdPxy095Ux6znaQ", "4QNpBfC0zvjKqPJcyqBy9W",
+  "3qhlB30KknSejmIvZZLjOD", "190jyVPHYjAqEaOGmMzdyk", "3d0WouFnFmr0K3kjeza3fF",
+  "1rIKgCH4H52lrvDcz50hS8", "4CeeEOM32jQcH3eN9Q2dGj", "003vvx7Niy0yvhvHt4a68B",
+  "2KTxKoM4iUYCtuUGGIh9Qu", "3fjmSxt0PskST13CSdBUFx", "60a0Rd6pjrkxjPbaKzXjfq",
+  "4Yf5bqU3NK4kNOypcrLYwU", "2nLtzopw4rPReszdYBJU6h", "25FTMokYEbEWHEdss5JLZS",
+  "0COqiPhxzoWICwFCS4eZcp", "3ZOEytgrvLwQaqXreDs2Jx", "7gcQ6D1K3BmDNmo8jaGmr5",
+  "7MmG8p0F9N3C4AXdK6o6Eb", "6YUTL4dYpB9xZO5qExPf05", "7ef4DlsgrMEH11cDZd32M6",
+  "5vmRQ3zELMLUQPo2FLQ76x", "4MSj19TwYBLgDFj3ddEeco", "1u8c2t2Cy7UBoG4ArRcF5g",
+  "0cqRj7pUJDkTCEsJkx8snD", "53iuhJlwXhSER5J2IYYv1W", "0ug5NqcwcFR2xrfTkc7k8e",
+  "2XHzzp1j4IfTNp1FTn7YFg", "09mEdoA6zrmBPgTEN5qXmN", "7fBv7CLKzipRk6EC6TWHOB",
+  "4PhsKqMdgMEUSstTDAmMpg", "7MXVkk9YMctZqd1Srtv4MB", "5QO79kh1waicV47BqGRL3g",
+  "3QaPy1KgI7nu9FJEQUgn6h", "7BRD7x5pt8Lqa1eGYC4dzj", "73SpzrcaHk0RQPFP73vqVR",
+  "6dOtVTDdiauQNBQEDOtlAB", "1ni8ZTAY1GHXEFOGHl7fdg", "2prqm9sPLj10B4Wg0wE5x9",
+  "38GBNKZUhfBkk3oNlWzRYd", "7J1uxwnxfQLu4APicE5Rnj", "1fu5IQSRgPxJL2OTP7FVLW",
+  "7qiZfU4dY1lWllzX7mPBI3", "0afhq8XCExXpqazXczTSve", "1huvTbEYtgltjQRXzrNKGi",
+  "6PCUP3dWmTjcTtXY02oFdT", "1VdZ0vKfR5jneCmWIUAMxK", "50nfwKoDiSYg8zOCREWAm5",
+  "3rmo8F54jFF8OgYsqTxm5d", "4drviHU6vP0yDFS6polxKI", "45BZcKdKl8OXpuGSlSvEun",
+  "49gruEYzuJZoy4R2q5xVlT", "5TRPicyLGbAF2LGBFbHGvO", "0mEdbdeRFQwBhN4xfyIeUM",
+  "3DK6m7It6Pw857FcQftMds", "4EWCNWgDS8707fNSZ1oaA5", "22L7bfCiAkJo5xGSQgmiIO",
+  "0j2T0R9dR9qdJYsB7ciXhf", "69uxyAqqPIsUyTO8txoP2M", "0FDzzruyVECATHXKHFs9eJ",
+  "0BCPKOYdS2jbQ8iyB56Zns", "3Fcfwhm8oRrBvBZ8KGhtea", "3AJwUDP919kvQ9QcozQPxg",
+  "75JFxkI2RXiU7L9VXzMkle", "3RiPr603aXAoi4GHyXx0uy", "6nek1Nin9q48AVZcWs9e9D",
+  "7LVHVU3tWfcxj5aiPFEW4Q", "4woTEX1wYOTGDqNXuavlRC", "3yfqSUWxFvZELEM4PmlwIR",
+  "4xkOaSrkexMciUUogZKVTS", "561jH07mF1jHuk7KlaeF0s", "3UmaczJpikHgJFyBTAJVoz",
+  "1v7L65Lzy0j0vdpRjJewt1", "48RrDBpOSSl1aLVCalGl5C", "2kQuhkFX7uSVepCD3h29g5",
+  "4OSBTYWVwsQhGLF9NHvIbR", "3bNv3VuUOKgrf5hu3YcuRo", "6VObnIkLVruX4UVyxWhlqm",
+  "3di5hcvxxciiqwMH1jarhY", "3rWRug4G3BjW33bxFwrEr9", "4lLtanYk6tkMvooU0tWzG8",
+];
+
+let isDailyMode = false;
+
+// Deterministic per-calendar-day index — same formula for everyone, so no
+// server round-trip is needed to agree on "today's song".
+function dailyIndex(poolLength) {
+  const now = new Date();
+  const key = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return hash % poolLength;
+}
+
+async function loadDailyChallenge() {
+  poolStatus.textContent = "Lade …";
+  // The batch "Get Several Tracks" endpoint is 403'd for this app (same
+  // Development Mode restriction as playlist tracks), so today's track is
+  // fetched individually — falling forward through the list on the rare
+  // chance it's not available in this user's market.
+  const start = dailyIndex(DAILY_POOL_IDS.length);
+  for (let offset = 0; offset < DAILY_POOL_IDS.length; offset++) {
+    const id = DAILY_POOL_IDS[(start + offset) % DAILY_POOL_IDS.length];
+    const res = await api(`/tracks/${id}?market=from_token`);
+    if (!res.ok) continue;
+    const track = await res.json();
+    if (!isUsable(track)) continue;
+    pool = [track];
+    isDailyMode = true;
+    poolLabel = "Daily Challenge";
+    poolStatus.textContent = `Daily Challenge · ${new Date().toLocaleDateString("de-DE")}`;
+    return true;
+  }
+  poolStatus.textContent = "Daily Challenge konnte nicht geladen werden";
+  return false;
 }
 
 async function loadLikedSongs() {
@@ -391,6 +469,7 @@ async function loadLikedSongs() {
   }
   poolLabel = "Liked Songs";
   poolStatus.textContent = `${poolLabel} · ${pool.length} Songs`;
+  isDailyMode = false;
   drawQueue = [];
   return true;
 }
@@ -424,6 +503,7 @@ async function loadSearchPool(query) {
   }
   poolLabel = query;
   poolStatus.textContent = `"${poolLabel}" · ${pool.length} Songs`;
+  isDailyMode = false;
   drawQueue = [];
   return true;
 }
@@ -822,8 +902,11 @@ btnCopy.addEventListener("click", () => {
   const line = history.map((h) => squares[h.type]).join("");
   const result = history[history.length - 1]?.type === "correct"
     ? `${history.length}/${MAX_ATTEMPTS}`
-    : "X/6";
-  const text = `Needle Drop ${result}\n${line}`;
+    : `X/${MAX_ATTEMPTS}`;
+  const heading = isDailyMode
+    ? `Needle Drop Daily · ${new Date().toLocaleDateString("de-DE")} · ${result}`
+    : `Needle Drop ${result}`;
+  const text = `${heading}\n${line}`;
   navigator.clipboard.writeText(text).then(() => {
     btnCopy.textContent = "Kopiert!";
     setTimeout(() => (btnCopy.textContent = "Ergebnis kopieren"), 1500);
@@ -838,6 +921,11 @@ btnSkip.addEventListener("click", skip);
 btnPool.addEventListener("click", async () => {
   const q = playlistInput.value.trim();
   const ok = q ? await loadSearchPool(q) : await loadLikedSongs();
+  if (ok) newRound();
+});
+
+btnDaily.addEventListener("click", async () => {
+  const ok = await loadDailyChallenge();
   if (ok) newRound();
 });
 
