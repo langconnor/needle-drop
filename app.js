@@ -238,6 +238,29 @@ function initPlayer() {
     gameStatus.textContent = `Wiedergabefehler: ${message}`;
   });
 
+  // Safety net: if our own setTimeout-based auto-stop is ever late for any
+  // reason (throttled background tab, a dropped pause request, ...), this
+  // catches it from the SDK's own reported position instead of trusting
+  // local timing alone — this is what stops a snippet from silently running
+  // into the full song.
+  player.addListener("player_state_changed", (state) => {
+    if (!state || !isPlaying) return;
+    if (!state.paused && state.position >= currentTargetMs()) {
+      revealedMs = currentTargetMs();
+      isPlaying = false;
+      segmentToken++;
+      clearTimeout(stopTimer);
+      cancelAnimationFrame(rafId);
+      renderDial(revealedMs);
+      resetPlayButtonIcon();
+      pausePlayback()
+        .catch(() => {})
+        .finally(() => {
+          btnPlay.disabled = false;
+        });
+    }
+  });
+
   player.connect();
 }
 
@@ -408,8 +431,14 @@ function scheduleAutoStop(myToken) {
     cancelAnimationFrame(rafId);
     renderDial(revealedMs);
     resetPlayButtonIcon();
-    btnPlay.disabled = false;
+    // Keep the button disabled until Spotify has actually confirmed the
+    // pause — re-enabling it earlier left a window where a fast click could
+    // fire a new play command while the pause was still in flight, and
+    // whichever arrived second at Spotify would win, sometimes letting
+    // playback continue unpaused straight into the rest of the song.
     await pausePlayback().catch(() => {});
+    if (myToken !== segmentToken) return;
+    btnPlay.disabled = false;
   }, remaining);
 }
 
