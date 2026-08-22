@@ -341,9 +341,12 @@ let attempt = 0;
 let history = []; // { type: 'wrong'|'skip'|'correct', label }
 let gameOver = false;
 
-// revealedMs = how much of the track (contiguous from 0) has been played so
-// far. Playback always resumes from here — it never restarts from zero.
+// revealedMs = the high-water mark of how much of the track has been
+// revealed so far (contiguous from 0). The manual Play button always
+// replays everything revealed so far from position 0; only Skip's
+// auto-continuation picks up from here to play just the newly added slice.
 let revealedMs = 0;
+let playBaseMs = 0; // where the *current* segment's playback started from
 let segmentStartPerf = null;
 let isPlaying = false;
 let stopTimer = null;
@@ -351,7 +354,7 @@ let rafId = null;
 
 function liveRevealedMs() {
   if (!isPlaying || segmentStartPerf == null) return revealedMs;
-  return Math.min(TOTAL_MS, revealedMs + (performance.now() - segmentStartPerf));
+  return Math.min(TOTAL_MS, playBaseMs + (performance.now() - segmentStartPerf));
 }
 
 function currentTargetMs() {
@@ -393,15 +396,16 @@ function scheduleAutoStop() {
   }, remaining);
 }
 
-async function startPlayback() {
+async function beginSegment(baseMs) {
   if (!deviceId || !answer || gameOver || isPlaying) return;
   isPlaying = true;
+  playBaseMs = baseMs;
   segmentStartPerf = performance.now();
   iconPlay.classList.add("hidden");
   iconPause.classList.remove("hidden");
   btnPlay.classList.add("playing");
   try {
-    await playFrom(answer.uri, revealedMs);
+    await playFrom(answer.uri, baseMs);
   } catch (e) {
     gameStatus.textContent = "Konnte nicht abspielen — Spotify-App evtl. woanders aktiv?";
     isPlaying = false;
@@ -410,6 +414,17 @@ async function startPlayback() {
   }
   scheduleAutoStop();
   runFillLoop();
+}
+
+// Manual Play button — always replays from the very start of the track.
+function startPlayback() {
+  return beginSegment(0);
+}
+
+// Used right after a Skip when nothing is currently playing — picks up
+// exactly where the last segment stopped instead of restarting from zero.
+function continueFromLastStop() {
+  return beginSegment(revealedMs);
 }
 
 // Stops the JS-side timer/animation and, if still playing, pauses Spotify
@@ -456,6 +471,7 @@ function renderAttempts() {
 function newRound() {
   haltPlayback();
   revealedMs = 0;
+  playBaseMs = 0;
   renderDial(0);
 
   answer = nextAnswer();
@@ -604,6 +620,7 @@ function skip() {
   const wasPlaying = isPlaying;
   if (wasPlaying) {
     revealedMs = liveRevealedMs();
+    playBaseMs = revealedMs;
     segmentStartPerf = performance.now();
   }
 
@@ -616,7 +633,7 @@ function skip() {
   if (wasPlaying) {
     scheduleAutoStop(); // same stream, just pushes the auto-pause further out
   } else {
-    startPlayback(); // resumes from revealedMs, not from zero
+    continueFromLastStop(); // plays only the newly added slice, once
   }
 }
 
