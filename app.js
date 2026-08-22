@@ -244,8 +244,17 @@ function initPlayer() {
   // local timing alone — this is what stops a snippet from silently running
   // into the full song.
   player.addListener("player_state_changed", (state) => {
-    if (!state || !isPlaying) return;
+    if (!state) return;
+    dbg(
+      "state_changed: isPlaying=", isPlaying,
+      "paused=", state.paused,
+      "position=", state.position,
+      "track=", state.track_window?.current_track?.name,
+      "target=", isPlaying ? currentTargetMs() : "n/a"
+    );
+    if (!isPlaying) return;
     if (!state.paused && state.position >= currentTargetMs()) {
+      dbg("state_changed: SAFETY NET TRIGGERED, forcing pause");
       revealedMs = currentTargetMs();
       isPlaying = false;
       const myToken = ++segmentToken;
@@ -260,6 +269,13 @@ function initPlayer() {
   });
 
   player.connect();
+}
+
+// Temporary diagnostic logging to track down the "snippet keeps playing"
+// bug — safe to remove once it's found. Prefix makes it easy to filter in
+// devtools (type "ND" into the console filter box).
+function dbg(...args) {
+  console.log("[ND]", performance.now().toFixed(0) + "ms", ...args);
 }
 
 async function playFrom(uri, positionMs = 0) {
@@ -281,11 +297,17 @@ async function pausePlayback() {
 // is genuinely confirmed underway.
 async function waitForPlaybackStart(timeoutMs = 2500) {
   const deadline = performance.now() + timeoutMs;
+  let polls = 0;
   while (performance.now() < deadline) {
+    polls++;
     const state = await player?.getCurrentState().catch(() => null);
-    if (state && !state.paused) return state.position || 0;
+    if (state && !state.paused) {
+      dbg("waitForPlaybackStart: confirmed after", polls, "polls, position=", state.position);
+      return state.position || 0;
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
+  dbg("waitForPlaybackStart: TIMED OUT after", polls, "polls");
   return 0;
 }
 
@@ -294,12 +316,20 @@ async function waitForPlaybackStart(timeoutMs = 2500) {
 // Spotify didn't apply it, which is what used to let a snippet run on into
 // the full song with no way to notice or recover.
 async function hardPause(myToken) {
+  dbg("hardPause: start, token=", myToken);
   for (let attempt = 0; attempt < 4; attempt++) {
-    if (myToken !== segmentToken) return;
-    await pausePlayback().catch(() => {});
+    if (myToken !== segmentToken) {
+      dbg("hardPause: aborted, superseded (token now", segmentToken, ")");
+      return;
+    }
+    await pausePlayback().catch((e) => dbg("hardPause: pause request failed", e));
     await new Promise((r) => setTimeout(r, 200));
-    if (myToken !== segmentToken) return;
+    if (myToken !== segmentToken) {
+      dbg("hardPause: aborted after pause call, superseded");
+      return;
+    }
     const state = await player?.getCurrentState().catch(() => null);
+    dbg("hardPause: attempt", attempt, "state.paused=", state?.paused, "position=", state?.position);
     if (!state || state.paused) return;
   }
 }
@@ -452,7 +482,9 @@ function scheduleAutoStop(myToken) {
   clearTimeout(stopTimer);
   const target = currentTargetMs();
   const remaining = Math.max(0, target - liveRevealedMs());
+  dbg("scheduleAutoStop: token=", myToken, "target=", target, "remaining=", remaining);
   stopTimer = setTimeout(async () => {
+    dbg("scheduleAutoStop: TIMER FIRED, token=", myToken, "currentToken=", segmentToken);
     if (myToken !== segmentToken) return; // a newer segment already took over
     revealedMs = target;
     isPlaying = false;
@@ -466,17 +498,24 @@ function scheduleAutoStop(myToken) {
 }
 
 async function beginSegment(baseMs) {
-  if (!deviceId || !answer || gameOver || isPlaying) return;
+  dbg("beginSegment: called with baseMs=", baseMs, "deviceId=", !!deviceId, "answer=", answer?.name, "gameOver=", gameOver, "isPlaying=", isPlaying);
+  if (!deviceId || !answer || gameOver || isPlaying) {
+    dbg("beginSegment: BLOCKED by guard");
+    return;
+  }
   isPlaying = true;
   playBaseMs = baseMs;
   const myToken = ++segmentToken;
+  dbg("beginSegment: proceeding, token=", myToken);
   btnPlay.disabled = true; // the literal fix for spamming Play: it just can't be clicked again mid-clip
   iconPlay.classList.add("hidden");
   iconPause.classList.remove("hidden");
   btnPlay.classList.add("playing");
   try {
     await playFrom(answer.uri, baseMs);
+    dbg("beginSegment: playFrom resolved, token=", myToken);
   } catch (e) {
+    dbg("beginSegment: playFrom THREW", e);
     if (myToken !== segmentToken) return; // superseded while this request was in flight
     gameStatus.textContent = "Konnte nicht abspielen — Spotify-App evtl. woanders aktiv?";
     isPlaying = false;
