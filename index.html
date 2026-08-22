@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Needle Drop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="scene">
+  <div class="glow" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="wordmark">Needle<em>Drop</em></div>
+    <div id="account-pill" class="account-pill hidden">
+      <span class="dot"></span>
+      <span id="account-name">Verbunden</span>
+    </div>
+  </header>
+
+  <!-- LOGIN SCREEN -->
+  <section id="screen-login" class="screen">
+    <div class="login-card">
+      <div class="mini-bars" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <h1>Wie weit reicht<br>dein Gehör?</h1>
+      <p class="sub">Sechs Versuche. Der Clip wächst mit jedem Fehlgriff — 1, 2, 4, 7, 11, 16 Sekunden am Stück. Direkt aus deiner eigenen Spotify-Bibliothek.</p>
+      <button id="btn-login" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.6"/><path d="M7 15.5c3-1 7-1 10 1M6.5 12c4-1.3 8.5-1.2 11.5.6M6 8.5c4.5-1.6 10-1.4 13 .8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Mit Spotify verbinden
+      </button>
+      <p class="fineprint">Erfordert Spotify Premium. Du meldest dich direkt bei Spotify an — nichts davon läuft über uns.</p>
+      <p id="login-error" class="error hidden"></p>
+    </div>
+  </section>
+
+  <!-- GAME SCREEN -->
+  <section id="screen-game" class="screen hidden">
+
+    <div class="pool-row">
+      <label for="playlist-input">Song-Pool</label>
+      <input id="playlist-input" type="text" placeholder="Künstler oder Genre (leer = Liked Songs)">
+      <button id="btn-pool" class="btn btn-ghost btn-sm">Übernehmen</button>
+      <span id="pool-status" class="pool-status">Liked Songs</span>
+    </div>
+
+    <div class="player-card">
+      <button id="btn-play" class="play-button" aria-label="Ausschnitt abspielen">
+        <svg id="icon-play" class="icon-play" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="icon-pause" class="icon-pause hidden" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
+      </button>
+
+      <div class="timeline">
+        <div class="timeline-track">
+          <div id="timeline-fill" class="timeline-fill"></div>
+          <div class="timeline-ticks">
+            <span data-s="1"></span><span data-s="2"></span><span data-s="4"></span>
+            <span data-s="7"></span><span data-s="11"></span><span data-s="16"></span>
+          </div>
+        </div>
+        <div class="timeline-labels">
+          <span>1s</span><span>2s</span><span>4s</span><span>7s</span><span>11s</span><span>16s</span>
+        </div>
+      </div>
+
+      <div id="dial-readout" class="dial-readout"><span id="dial-readout-value">0.0</span>s <span class="dial-readout-total">/ 16s gehört</span></div>
+    </div>
+
+    <div class="attempts" id="attempts-row"></div>
+
+    <div class="guess-area">
+      <div class="guess-input-wrap">
+        <input id="guess-input" type="text" autocomplete="off" placeholder="Songtitel oder Artist tippen …" disabled>
+        <ul id="guess-suggestions" class="suggestions hidden"></ul>
+      </div>
+      <button id="btn-submit" class="btn btn-primary" disabled>Raten</button>
+      <button id="btn-skip" class="btn btn-ghost" disabled>Skip</button>
+    </div>
+
+    <div id="reveal" class="reveal hidden">
+      <img id="reveal-art" class="reveal-art" alt="">
+      <div class="reveal-info">
+        <div id="reveal-result" class="reveal-result"></div>
+        <div id="reveal-title" class="reveal-title"></div>
+        <div id="reveal-artist" class="reveal-artist"></div>
+        <div class="reveal-actions">
+          <a id="reveal-open" class="btn btn-ghost btn-sm" href="#" target="_blank" rel="noopener">In Spotify öffnen</a>
+          <button id="btn-full" class="btn btn-ghost btn-sm">Ganzen Song hören</button>
+          <button id="btn-copy" class="btn btn-ghost btn-sm">Ergebnis kopieren</button>
+          <button id="btn-next" class="btn btn-primary btn-sm">Nächste Runde</button>
+        </div>
+      </div>
+    </div>
+
+    <p id="game-status" class="game-status"></p>
+  </section>
+
+</div>
+
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
