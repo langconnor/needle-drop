@@ -1,11 +1,13 @@
 // ---------------------------------------------------------------------------
 // Needle Drop — Heardle-style guessing game powered by the real Spotify
-// Web Playback SDK + Web API. Requires Spotify Premium and a Client ID
-// registered at developer.spotify.com with redirect URI http://127.0.0.1:8888/
+// Web Playback SDK + Web API. Requires Spotify Premium. The redirect URI is
+// derived from wherever this page is actually loaded from (localhost during
+// development, the GitHub Pages URL in production) — register both exact
+// URLs in the Spotify app's dashboard under Redirect URIs.
 // ---------------------------------------------------------------------------
 
 const CLIENT_ID = "86ad66b6193946019291f81969b513d4";
-const REDIRECT_URI = "http://127.0.0.1:8888/";
+const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES = [
   "streaming",
   "user-read-email",
